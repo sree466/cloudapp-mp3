@@ -11,10 +11,12 @@ import backtype.storm.topology.IRichSpout;
 import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
+import backtype.storm.utils.Utils;
 
 public class FileReaderSpout implements IRichSpout {
   private SpoutOutputCollector _collector;
   private TopologyContext context;
+  private BufferedReader fileReader;
 
 
   @Override
@@ -30,6 +32,13 @@ public class FileReaderSpout implements IRichSpout {
 
     this.context = context;
     this._collector = collector;
+    try {
+      this.fileReader = new BufferedReader(new FileReader(conf.get("inputFile").toString()));
+    }
+    catch(Exception e){
+
+    }
+
   }
 
   @Override
@@ -42,7 +51,18 @@ public class FileReaderSpout implements IRichSpout {
     2. don't forget to sleep when the file is entirely read to prevent a busy-loop
 
     ------------------------------------------------- */
+    try {
+      String line = this.fileReader.readLine();
+      if(line != null){
+        _collector.emit(new Values(line));
+      }
+	  else{
+		Utils.sleep(1000);
+	  }
+    }
+    catch(Exception e){
 
+    }
 
   }
 
@@ -61,7 +81,12 @@ public class FileReaderSpout implements IRichSpout {
 
 
     ------------------------------------------------- */
+	try {
+      this.fileReader.close();
+    }
+    catch(Exception e){
 
+    }
   }
 
 
