@@ -11,11 +11,13 @@ import java.util.*;
  * a bolt that finds the top n words.
  */
 public class TopNFinderBolt extends BaseBasicBolt {
-  private TreeSet<Pair<Integer, String>> countToWordMap = new TreeSet<Pair<Integer, String>>();
+  private HashMap<String, Integer> currentTopWords = new HashMap<String, Integer>();
   private int N;
 
   private long intervalToReport = 20;
   private long lastReportTime = System.currentTimeMillis();
+    private long leastcount = 0;
+    private String leaststring = new String();
 
   public TopNFinderBolt(int N) {
     this.N = N;
@@ -31,10 +33,31 @@ public class TopNFinderBolt extends BaseBasicBolt {
     ------------------------------------------------- */
 	String word = tuple.getString(0);
 	Integer count = tuple.getInteger(1);
-	countToWordMap.add(new Pair<Integer, String>(count, word));
-	if (countToWordMap.size() > this.N) {
-		countToWordMap.remove(countToWordMap.first());
-	}
+      if(currentTopWords.isEmpty()){
+          leastcount = count;
+          leaststring = word;
+      }
+    if(currentTopWords.containsKey(word) || currentTopWords.size() < this.N){
+        currentTopWords.put(word , count);
+        if(leastcount > count){
+            leastcount = count;
+            leaststring = word;
+        }
+      }
+      else if (leastcount < count){
+        currentTopWords.put(word , count);
+        currentTopWords.remove(leaststring);
+        leastcount = count;
+        leaststring = word;
+        for (Map.Entry<String, Integer> entry : currentTopWords.entrySet()) {
+            String curword = entry.getKey();
+            Integer curcount = entry.getValue();
+            if(leastcount > curcount){
+                leastcount = curcount;
+                leaststring = curword;
+            }
+        }
+    }
     //reports the top N words periodically
     if (System.currentTimeMillis() - lastReportTime >= intervalToReport) {
       collector.emit(new Values(printMap()));
@@ -52,8 +75,8 @@ public class TopNFinderBolt extends BaseBasicBolt {
   public String printMap() {
     StringBuilder stringBuilder = new StringBuilder();
     stringBuilder.append("top-words = [ ");
-    for (Pair<Integer, String> wordpair : countToWordMap) {
-      stringBuilder.append(wordpair.toString() + " , ");
+    for (String word : currentTopWords.keySet()) {
+      stringBuilder.append("(" + word + " , " + currentTopWords.get(word) + ") , ");
     }
     int lastCommaIndex = stringBuilder.lastIndexOf(",");
     stringBuilder.deleteCharAt(lastCommaIndex + 1);
@@ -62,57 +85,4 @@ public class TopNFinderBolt extends BaseBasicBolt {
     return stringBuilder.toString();
 
   }
-}
-
-class Pair<A extends Comparable<? super A>,
-        B extends Comparable<? super B>>
-        implements Comparable<Pair<A, B>> {
-
-    public final A first;
-    public final B second;
-
-    public Pair(A first, B second) {
-        this.first = first;
-        this.second = second;
-    }
-
-    public static <A extends Comparable<? super A>,
-            B extends Comparable<? super B>>
-    Pair<A, B> of(A first, B second) {
-        return new Pair<A, B>(first, second);
-    }
-
-    @Override
-    public int compareTo(Pair<A, B> o) {
-        int cmp = o == null ? 1 : (this.first).compareTo(o.first);
-        return cmp == 0 ? (this.second).compareTo(o.second) : cmp;
-    }
-
-    @Override
-    public int hashCode() {
-        return 31 * hashcode(first) + hashcode(second);
-    }
-
-    private static int hashcode(Object o) {
-        return o == null ? 0 : o.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (!(obj instanceof Pair))
-            return false;
-        if (this == obj)
-            return true;
-        return equal(first, ((Pair<?, ?>) obj).first)
-                && equal(second, ((Pair<?, ?>) obj).second);
-    }
-
-    private boolean equal(Object o1, Object o2) {
-        return o1 == o2 || (o1 != null && o1.equals(o2));
-    }
-
-    @Override
-    public String toString() {
-        return "(" + second + ", " + first + ')';
-    }
 }
